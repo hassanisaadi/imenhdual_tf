@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 from PIL import Image
+import PIL
 
 def data_augmentation(image, mode):
     if mode == 0:
@@ -84,15 +85,19 @@ def load_data(fxl='./data/mb2014_bin/imL.npy',
     return train_data(fxl=fxl, fxr=fxr, fyl=fyl, fyr=fyr)
 
 
-def load_images(filelist):
+def load_images(filelist, sH=1, sW=1):
     # pixel value range 0-255
     if not isinstance(filelist, list):
         im = Image.open(filelist)
-        return np.array(im).reshape(1, im.size[1], im.size[0], 3)
+        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
+        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
+        return np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3)
     data = []
     for file in filelist:
         im = Image.open(file)
-        data.append(np.array(im).reshape(1, im.size[1], im.size[0], 3))
+        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
+        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
+        data.append(np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3))
     return data
 
 

@@ -28,12 +28,12 @@ def generate_patches():
     fpyleft  = glob.glob(args.src_dir + '/Y_left/*.png')
 #    fpyright = glob.glob(args.src_dir + '/Y_right/*.png')
 
-    print("number of image pairs %d" % (len(fpxleft)-185))
+    print("number of image pairs %d" % len(fpxleft))
 
     #scales = [1, 0.9, 0.8, 0.7]
     scales = [1]
 
-    for i in xrange(len(fpxleft)-185):
+    for i in xrange(len(fpxleft)):
         img = Image.open(fpxleft[i])
         for s in xrange(len(scales)):
             newsize = (int(img.size[0]*scales[s]), int(img.size[1]*scales[s]))
@@ -59,7 +59,7 @@ def generate_patches():
 #    inputsYR = np.zeros((numPatches, args.pat_size, args.pat_size, 3), dtype = "uint8")
 
     count = 0
-    for i in xrange(len(fpxleft)-185):
+    for i in xrange(len(fpxleft)):
         imgL = Image.open(fpxleft[i])
         imgR = Image.open(fpxright[i])
         imgYL = Image.open(fpyleft[i])

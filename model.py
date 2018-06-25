@@ -4,12 +4,6 @@ import time
 from utils import *
 
 def msr_dual_net(inL, inR, n, v, K, is_training=True):
-    out = tf.concat([inL, inR], 2)
-    out = tf.layers.conv2d(out, 3, 3, (1,1), activation=tf.nn.relu,
-            padding='same', name='conv1R')
-    return out
-
-    
     ### Left
     assert n >= 2, 'n must be greater than 2'
     assert len(v) == n, 'len(v) must be equal to n'
@@ -19,11 +13,11 @@ def msr_dual_net(inL, inR, n, v, K, is_training=True):
     MSL0 = tf.div(tf.log1p(tf.scalar_mul(tf_v[0], inL)), tf.log(1+tf_v[0]))
     MSL1 = tf.div(tf.log1p(tf.scalar_mul(tf_v[1], inL)), tf.log(1+tf_v[1]))
 
-    outL = tf.concat([MSL0, MSL1], 2) ###!!!
+    outL = tf.concat([MSL0, MSL1], 3) 
     for i in tf_v[2:]:
         MSLtmp = tf.div(tf.log1p(tf.scalar_mul(i, inL)),
                       tf.log(1+i))
-        outL = tf.concat([outL, MSLtmp], 2) ###!!!
+        outL = tf.concat([outL, MSLtmp], 3)
 
     outL =  tf.layers.conv2d(
             outL, 32 , 1, (1, 1), activation=tf.nn.relu,
@@ -39,9 +33,9 @@ def msr_dual_net(inL, inR, n, v, K, is_training=True):
         HL.append(tf.layers.conv2d(
                 HL[k-1], 32, 3, (1, 1), activation=tf.nn.relu,
                 padding='same', name='convH%dL'%k))
-    HK1L = tf.concat([HL[0],HL[1]],2) ###!!!
+    HK1L = tf.concat([HL[0],HL[1]],3) 
     for k in range(2,K):
-        HK1L = tf.concat([HK1L,HL[k]],2) ###!!!
+        HK1L = tf.concat([HK1L,HL[k]],3)
     HK1L = tf.layers.conv2d(
         HK1L, 3, 1, (1, 1), activation=tf.nn.relu,
         padding='same', name='convHK1L')
@@ -52,11 +46,11 @@ def msr_dual_net(inL, inR, n, v, K, is_training=True):
     MSR1 = tf.div(tf.log1p(tf.scalar_mul(tf_v[1], inR)),
                   tf.log(1+tf_v[1]))
 
-    outR = tf.concat([MSR0, MSR1], 2) ###!!!
+    outR = tf.concat([MSR0, MSR1], 3)
     for i in tf_v[2:]:
         MSRtmp = tf.div(tf.log1p(tf.scalar_mul(i, inR)),
                       tf.log(1+i))
-        outR = tf.concat([outR, MSRtmp], 2) ###!!!
+        outR = tf.concat([outR, MSRtmp], 3)
 
     outR =  tf.layers.conv2d(
             outR, 32 , 1, (1, 1), activation=tf.nn.relu,
@@ -72,15 +66,15 @@ def msr_dual_net(inL, inR, n, v, K, is_training=True):
         HR.append(tf.layers.conv2d(
                 HR[k-1], 32, 3, (1, 1), activation=tf.nn.relu,
                 padding='same', name='convH%dR'%k))
-    HK1R = tf.concat([HR[0],HR[1]],2) ###!!!
+    HK1R = tf.concat([HR[0],HR[1]],3)
     for k in range(2,K):
-        HK1R = tf.concat([HK1R,HR[k]],2) ###!!!
+        HK1R = tf.concat([HK1R,HR[k]],3)
     HK1R = tf.layers.conv2d(
         HK1R, 3, 1, (1, 1), activation=tf.nn.relu,
         padding='same', name='convHK1R')
     outR = tf.subtract(outR, HK1R)
     ### Concatenation
-    out = tf.concat([outL, outR],2) ###!!!
+    out = tf.concat([outL, outR],3)
     for i in range(1,4):
         out = tf.layers.conv2d(
             out, 16, 3, (1, 1), activation=tf.nn.relu,
@@ -115,17 +109,19 @@ class imdualenhancer(object):
         init = tf.global_variables_initializer()
         self.sess.run(init)
         print("[*] Initialize model successfully ...")
+        sys.stdout.flush()
 
     def evaluate(self, iter_num, testXL, testXR, testY,
                  sample_dir, summary_merged, summary_writer):
         # assert test_Data value range is 0-255
         print("[*] Evaluating...")
+        sys.stdout.flush()
 
         psnr_sum = 0
         for idx in xrange(len(testXL)):
-            imL = testXL[idx].astype(np.float32) / 255.0
-            imR = testXR[idx].astype(np.float32) / 255.0
-            gt  = testY[idx].astype(np.float32) / 255.0
+            imL = testXL[idx].reshape(1,testXL[idx].shape[1],testXL[idx].shape[2],testXL[idx].shape[3]).astype(np.float32) / 255.0
+            imR = testXR[idx].reshape(1,testXR[idx].shape[1],testXR[idx].shape[2],testXR[idx].shape[3]).astype(np.float32) / 255.0
+            gt  = testY[idx].reshape(1 ,testY[idx].shape[1],testY[idx].shape[2],testY[idx].shape[3]).astype(np.float32) / 255.0
             imOut, psnr_summary = self.sess.run(
                     [self.Y, summary_merged],
                     feed_dict={self.Y_:gt, self.XL:imL,
@@ -138,16 +134,19 @@ class imdualenhancer(object):
             # calculate PSNR
             psnr = cal_psnr(groundtruth, output_image)
             print("img%d PSNR: %.2f" % (idx+1, psnr))
+            sys.stdout.flush()
             psnr_sum += psnr
             save_images(os.path.join(sample_dir, 'test%d_%d.png' % (idx+1, iter_num)),
                         groundtruth, dark_imageL, output_image)
         avg_psnr = psnr_sum / len(testXL)
         print("--- Test --- Average PSNR %.2f ---" % avg_psnr)
+        sys.stdout.flush()
 
 
-    def train(self, XL, XR, Y, eval_XL, eval_XR, eval_Y, 
-              batch_size, ckpt_dir, epoch, lr, 
-              sample_dir, eval_every_epoch=2):
+    def train(self, XL, XR, Y, 
+              eval_XL, eval_XR, eval_Y,
+              batch_size, ckpt_dir, end_epoch, lr, 
+              sample_dir, eval_every_epoch=2, proc='cpu'):
         # assert data range is between 0 and 1
         numBatch = int(XL.shape[0] / batch_size)
         # load pretrained model
@@ -157,11 +156,13 @@ class imdualenhancer(object):
             start_epoch = global_step // numBatch
             start_step = global_step % numBatch
             print("[*] Model restore success!")
+            sys.stdout.flush()
         else:
             iter_num = 0
             start_epoch = 0
             start_step = 0
             print("[*] Not find pretrained model!")
+            sys.stdout.flush()
 
         # make summary
         tf.summary.scalar('loss', self.loss)
@@ -171,49 +172,56 @@ class imdualenhancer(object):
         summary_psnr = tf.summary.scalar('eva_psnr', self.eva_psnr)
         print("[*] Start training, with start epoch %d start iter %d : " %
                 (start_epoch, iter_num))
+        sys.stdout.flush()
         start_time = time.time()
         self.evaluate(iter_num, eval_XL, eval_XR, eval_Y, 
                       sample_dir=sample_dir,
                       summary_merged=summary_psnr,
                       summary_writer=writer) # eval_dat range is 0-255
-        for epoch in xrange(start_epoch, epoch):
+        for epoch in xrange(start_epoch, end_epoch):
             idx = np.random.permutation(XL.shape[0])
             XL = XL[idx].reshape(XL.shape)
-            XR = XR[idx].reshape(XR.shape) ###!!! check pls
+            XR = XR[idx].reshape(XR.shape)
+            loss = np.zeros(numBatch)
             for batch_id in xrange(start_step, numBatch):
                 batch_imL = XL[batch_id*batch_size:(batch_id+1)*batch_size,:,:,:]
                 batch_imR = XR[batch_id*batch_size:(batch_id+1)*batch_size,:,:,:]
                 batch_gt  =  Y[batch_id*batch_size:(batch_id+1)*batch_size,:,:,:]
-                _, loss, summary = self.sess.run(
+                _, loss[batch_id], summary = self.sess.run(
                         [self.train_op, self.loss, merged],
                         feed_dict={self.Y_:batch_gt, 
                                    self.XL:batch_imL,
                                    self.XR:batch_imR,
+                                   self.lr: lr[epoch],
                                    self.is_training: True})
-                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, loss: %.6f"
-                        % (epoch+1, batch_id+1, numBatch, time.time() - start_time, loss))
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
+            print("Epoch: [%2d] time: %4.4f, avg_loss: %.6f, std_loss: %.6f"
+                  % (epoch+1, time.time() - start_time, loss.sum()/(numBatch-start_step), loss.std())) ###!!! std
+            sys.stdout.flush()
             if np.mod(epoch+1, eval_every_epoch) == 0:
-                self.evaluate(iter_num, eval_XL, eval_XR, eval_Y,
-                        sample_dir=sample_dir,
-                        summary_merged=summary_psnr,
-                        summary_writer=writer) # eval_data value range is 0-255
-                self.save(iter_num, ckpt_dir)
+               self.evaluate(iter_num, eval_XL, eval_XR, eval_Y,
+                       sample_dir=sample_dir,
+                       summary_merged=summary_psnr,
+                       summary_writer=writer) # eval_data value range is 0-255
+               self.save(iter_num, ckpt_dir, proc=proc)
         print("[*] Finish training.")
+        sys.stdout.flush()
 
-    def save(self, iter_num, ckpt_dir, model_name='msr_dual_net'):
+    def save(self, iter_num, ckpt_dir, model_name='msr_dual_net', proc='cpu'):
         saver = tf.train.Saver()
         checkpoint_dir = ckpt_dir
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         print("[*] Saving model...")
+        sys.stdout.flush()
         saver.save(self.sess,
-                os.path.join(checkpoint_dir, model_name),
+                os.path.join(checkpoint_dir, model_name+'-'+proc),
                 global_step=iter_num)
 
     def load(self, checkpoint_dir):
         print("[*] Reading checkpoint...")
+        sys.stdout.flush()
         saver = tf.train.Saver()
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
@@ -232,12 +240,14 @@ class imdualenhancer(object):
         load_model_status, global_step = self.load(ckpt_dir)
         assert load_model_status == True, '[!] Load weights FAILED...'
         print("[*] Load weights SUCCESS...")
+        sys.stdout.flush()
         psnr_sum = 0
         print("[*] Start testing...")
+        sys.stdout.flush()
         for idx in xrange(len(test_filesL)):
-            imL = load_images(test_filesL[idx]).astype(np.float32) / 255.0
-            imR = load_images(test_filesR[idx]).astype(np.float32) / 255.0
-            imY = load_images(test_filesY[idx]).astype(np.float32) / 255.0
+            imL = load_images(test_filesL[idx],0.5,0.5).astype(np.float32) / 255.0
+            imR = load_images(test_filesR[idx],0.5,0.5).astype(np.float32) / 255.0
+            imY = load_images(test_filesY[idx],0.5,0.5).astype(np.float32) / 255.0
             Yhat = self.sess.run(
                     [self.Y], feed_dict={
                         self.Y_:imY,
@@ -250,6 +260,7 @@ class imdualenhancer(object):
             # calculate PSNR
             psnr = cal_psnr(groundtruth, outputimage)
             print("img%d PSNR: %.2f" % (idx, psnr))
+            sys.stdout.flush()
             psnr_sum += psnr
             save_images(os.path.join(save_dir, 'inputL%d.png' % idx),
                     inputL)
@@ -257,3 +268,4 @@ class imdualenhancer(object):
                     outputimage)
         avg_psnr = psnr_sum / len(test_filesL)
         print("--- Average PSNR %.2f ---" % avg_psnr)
+        sys.stdout.flush()

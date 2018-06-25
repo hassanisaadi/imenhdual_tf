@@ -1,6 +1,12 @@
 # imenhdual_tf
 
-# Image Enhacement in Dual-Camera Architecture Using Deep Learning
+# Image Enhacement in Dual-Camera Architecture Using Deep Learning (Tensorflow)
 
-## To Do List:
-* Creating Dataset
+## Summary
+The goal in this project is enhancing image quality in low-light condition using dual camera architecture. We use a CNN network to train our model on [middleburry](http://vision.middlebury.edu/stereo/data/scenes2014/) dataset. This dataset is for depth estimation using two cameras. Since the dataset provided us image paris (left and right) with different exposure time, we have very dark (low-light) image pairs.
+
+## Results
+This repository is under progress and the results will be updated...
+
+## Inspiration code
+Thanks to [DnCNN-tensorflow](https://github.com/crisb-DUT/DnCNN-tensorflow).

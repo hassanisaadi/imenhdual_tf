@@ -37,8 +37,10 @@ def imdualenhancer_train(imdualenhancer, lr, proc):
                    fyl=args.fpyl) as data:
         # if there is a small memory, please comment this line and uncomment the line99 in model.py
         XL = data[0].astype(np.float32) / 255.0  # normalize the data to 0-1
-        XR = data[1].astype(np.float32) / 255.0 
-        YL = data[2].astype(np.float32) / 255.0  
+        XR = data[1].astype(np.float32) / 255.0
+        YL = data[2].astype(np.float32) / 255.0
+        #print("XL shape = "+str(XL.shape))
+        #print("numBatch = "+str(XL.shape[0]/args.batch_size))
         eval_filesXL = glob('./data/mb2014_png/eval/X_left/*.png')
         eval_filesXR = glob('./data/mb2014_png/eval/X_right/*.png')
         eval_filesYL = glob('./data/mb2014_png/eval/Y_left/*.png')
@@ -70,7 +72,7 @@ def main(_):
         os.makedirs(args.test_dir)
 
     lr = args.lr * np.ones([args.epoch])
-    lr[1000:] = lr[0] / 10.0
+    lr[int(0.5*args.epoch):] = lr[0] / 10.0
     if args.use_gpu:
         # added to control the gpu memory
         print("GPU\n")

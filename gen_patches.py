@@ -103,9 +103,9 @@ def generate_patches():
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
 
-    np.save(os.path.join(args.save_dir, "pa_L_p{}_b{}_da{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES)), inputsL)
-    np.save(os.path.join(args.save_dir, "pa_R_p{}_b{}_da{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES)), inputsR)
-    np.save(os.path.join(args.save_dir, "gt_L_p{}_b{}_da{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES)), inputsYL)
+    np.save(os.path.join(args.save_dir, "pa_L_p{}_b{}_da{}_s{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES,args.stride)), inputsL)
+    np.save(os.path.join(args.save_dir, "pa_R_p{}_b{}_da{}_s{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES,args.stride)), inputsR)
+    np.save(os.path.join(args.save_dir, "gt_L_p{}_b{}_da{}_s{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES,args.stride)), inputsYL)
 #    np.save(os.path.join(args.save_dir, "gt_R_p{}_b{}_da{}".format(args.pat_size,args.bat_size,args.DATA_AUG_TIMES)), inputsYR)
 
     print("size of inputs tensor = " + str(inputsL.shape))

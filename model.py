@@ -9,6 +9,55 @@ def simple_net(inL, inR, is_training=True):
     out = tf.layers.conv2d(out, 3, 3, (1, 1), activation=tf.nn.relu, padding='same')
     return out
 
+def msr_net(inL, inR, n, v, K, is_training=True):
+    ### Left
+    assert n >= 2, 'n must be greater than 2'
+    assert len(v) == n, 'len(v) must be equal to n'
+    assert K >= 2, 'K must be greater than 2'
+    tf_v = []
+    for i in v:
+        tf_v.append(tf.constant(i,dtype=tf.float32))
+    MSL0 = tf.div(tf.log1p(tf.scalar_mul(tf_v[0], inL)), tf.log(1+tf_v[0]))
+    MSL1 = tf.div(tf.log1p(tf.scalar_mul(tf_v[1], inL)), tf.log(1+tf_v[1]))
+
+    outL = tf.concat([MSL0, MSL1], 3)
+    #print("[1L] "+str(outL.shape))
+    for i in tf_v[2:]:
+        MSLtmp = tf.div(tf.log1p(tf.scalar_mul(i, inL)),
+                      tf.log(1+i))
+        outL = tf.concat([outL, MSLtmp], 3)
+    #print("[2L] "+str(outL.shape))
+
+    outL =  tf.layers.conv2d(
+            outL, 32 , 1, (1, 1), activation=tf.nn.relu,
+            padding='same', name='conv1L')
+    #print("[3L] "+str(outL.shape))
+    outL =  tf.layers.conv2d(
+            outL, 3 , 3, (1, 1), activation=tf.nn.relu,
+            padding='same', name='conv2L')
+    #print("[4L] "+str(outL.shape))
+    HL = []
+    HL.append(tf.layers.conv2d(
+            outL, 32, 3, (1, 1), activation=tf.nn.relu,
+            padding='same', name='convH0L'))
+    for k in range(1,K):
+        HL.append(tf.layers.conv2d(
+                HL[k-1], 32, 3, (1, 1), activation=tf.nn.relu,
+                padding='same', name='convH%dL'%k))
+    #print("[5L] "+str(len(HL)))
+    HK1L = tf.concat([HL[0],HL[1]],3) 
+    for k in range(2,K):
+        HK1L = tf.concat([HK1L,HL[k]],3)
+    #print("[6L] "+str(HK1L.shape))
+    HK1L = tf.layers.conv2d(
+        HK1L, 3, 1, (1, 1), activation=tf.nn.relu,
+        padding='same', name='convHK1L')
+    #print("[7L] "+str(HK1L.shape))
+    outL = tf.subtract(outL, HK1L)
+    #print("[8L] "+str(outL.shape))
+    return outL
+
+
 def msr_dual_net(inL, inR, n, v, K, is_training=True):
     ### Left
     assert n >= 2, 'n must be greater than 2'
@@ -111,7 +160,7 @@ def msr_dual_net(inL, inR, n, v, K, is_training=True):
     return inL - out
 
 class imdualenhancer(object):
-    def __init__(self, sess, n, v, K, batch_size=128):
+    def __init__(self, sess, n, v, K, batch_size=128, model_name='msr_dual_net'):
         self.sess = sess
         
         # build model
@@ -123,8 +172,15 @@ class imdualenhancer(object):
                 [None, None, None, 3], name='right_patch')
         self.is_training = tf.placeholder(tf.bool, 
                            name='is_training')
-        self.Y = msr_dual_net(self.XL, self.XR, n, v, K, is_training=self.is_training)
-        #self.Y = simple_net(self.XL, self.XR, is_training=self.is_training)
+        if model_name == 'msr_net':
+            self.Y = msr_net(self.XL, self.XR, n, v, K, is_training=self.is_training)
+        elif model_name == 'msr_dual_net':
+            self.Y = msr_dual_net(self.XL, self.XR, n, v, K, is_training=self.is_training)
+        elif model_name == 'simple_net':
+            self.Y = simple_net(self.XL, self.XR, is_training=self.is_training)
+        else:
+            print('Model name is not correct.')
+            sys.exit(1)
         self.loss = (1.0 / batch_size) * tf.nn.l2_loss(self.Y - self.Y_)
         #self.loss = (1.0 / batch_size) * tf.losses.absolute_difference(self.Y_, self.Y, weights=1.0)
         self.lr = tf.placeholder(tf.float32, 
@@ -141,7 +197,8 @@ class imdualenhancer(object):
         sys.stdout.flush()
 
     def evaluate(self, iter_num, testXL, testXR, testY,
-                 sample_dir, summary_merged, summary_writer, proc):
+                 sample_dir, summary_merged, summary_writer, proc,
+                 model_name):
         # assert test_Data value range is 0-255
         print("[*] Evaluating...")
         sys.stdout.flush()
@@ -165,7 +222,7 @@ class imdualenhancer(object):
             print("img%d PSNR: %.2f" % (idx+1, psnr))
             sys.stdout.flush()
             psnr_sum += psnr
-            save_images(os.path.join(sample_dir, 'test_%s_%d_%d.png' % (proc, idx+1, iter_num)),
+            save_images(os.path.join(sample_dir, 'test_%s_%s_%d_%d.png' % (model_name, proc, idx+1, iter_num)),
                         groundtruth, dark_imageL, output_image)
         avg_psnr = psnr_sum / len(testXL)
         print("--- Test --- Average PSNR %.2f ---" % avg_psnr)
@@ -175,7 +232,8 @@ class imdualenhancer(object):
     def train(self, XL, XR, Y, 
               eval_XL, eval_XR, eval_Y,
               batch_size, ckpt_dir, end_epoch, lr, 
-              sample_dir, eval_every_epoch=2, proc='cpu'):
+              sample_dir, eval_every_epoch=2, proc='cpu',
+              model_name='msr_dual_net'):
         # assert data range is between 0 and 1
         numBatch = int(XL.shape[0] / batch_size)
         # load pretrained model
@@ -206,7 +264,8 @@ class imdualenhancer(object):
         self.evaluate(iter_num, eval_XL, eval_XR, eval_Y, 
                       sample_dir=sample_dir,
                       summary_merged=summary_psnr,
-                      summary_writer=writer, proc=proc) # eval_dat range is 0-255
+                      summary_writer=writer, proc=proc,
+                      model_name=model_name) # eval_dat range is 0-255
         for epoch in xrange(start_epoch, end_epoch):
             idx = np.random.permutation(XL.shape[0])
             XL = XL[idx].reshape(XL.shape)
@@ -225,7 +284,7 @@ class imdualenhancer(object):
                                    self.is_training: True})
                 #print("Epoch: [%2d] [%4d/%4d] time: %4.4f, loss: %.6f"
                 #% (epoch+1, batch_id+1,numBatch, time.time() - start_time, loss[batch_id]))
-                #sys.stdout.flush()
+                sys.stdout.flush()
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
             print("Epoch: [%2d] time: %4.4f, avg_loss: %.6f, std_loss: %.6f"
@@ -235,8 +294,8 @@ class imdualenhancer(object):
                self.evaluate(iter_num, eval_XL, eval_XR, eval_Y,
                        sample_dir=sample_dir,
                        summary_merged=summary_psnr,
-                       summary_writer=writer, proc=proc) # eval_data value range is 0-255
-               self.save(iter_num, ckpt_dir, proc=proc)
+                       summary_writer=writer, proc=proc, model_name=model_name) # eval_data value range is 0-255
+               self.save(iter_num, ckpt_dir, proc=proc, model_name=model_name)
         print("[*] Finish training.")
         sys.stdout.flush()
 

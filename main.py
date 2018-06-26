@@ -24,14 +24,13 @@ parser.add_argument('--fpxr', dest='fpxr', default='./data/mb2014_bin/pa_R_p8_b1
 parser.add_argument('--fpyl', dest='fpyl', default='./data/mb2014_bin/gt_L_p8_b16_da1.npy', help='filepath to y_left')
 #parser.add_argument('--fpyr', dest='fpyr', default='./data/mb2014_bin/gt_R_p8_b16_da1.np', help='filepath to y_right')
 parser.add_argument('--eval_every_epoch', dest='eval_every_epoch', type=int, default=10, help='evaluate every epoch')
-
-
+parser.add_argument('--model_name', dest='model_name', default='msr_dual_net', help='model_name')
 
 args = parser.parse_args()
 
 args.v = [np.float32(s) for s in args.v.split(',')]
 
-def imdualenhancer_train(imdualenhancer, lr, proc):
+def imdualenhancer_train(imdualenhancer, lr, proc, model_name):
     with load_data(fxl=args.fpxl,
                    fxr=args.fpxr,
                    fyl=args.fpyl) as data:
@@ -52,10 +51,10 @@ def imdualenhancer_train(imdualenhancer, lr, proc):
                 batch_size=args.batch_size, 
                 ckpt_dir=args.ckpt_dir, end_epoch=args.epoch, lr=lr,
                 sample_dir=args.sample_dir,
-                eval_every_epoch=args.eval_every_epoch, proc=proc)
+                eval_every_epoch=args.eval_every_epoch, proc=proc,model_name=model_name)
 
 
-def imdualenhancer_test(denoiser):
+def imdualenhancer_test(denoiser):###!!!
     test_filesXL = glob('./data/mb2014_png/test/X_left/*.png')
     test_filesXR = glob('./data/mb2014_png/test/X_right/*.png')
     test_filesYL = glob('./data/mb2014_png/test/Y_left/*.png')
@@ -79,9 +78,10 @@ def main(_):
         sys.stdout.flush()
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
-            model = imdualenhancer(sess, args.n, args.v, args.K, args.batch_size)
+            model = imdualenhancer(sess, args.n, args.v, args.K,
+                    args.batch_size, model_name=args.model_name)
             if args.phase == 'train':
-                imdualenhancer_train(model, lr=lr, proc='gpu')
+                imdualenhancer_train(model, lr=lr, proc='gpu',model_name=args.model_name)
             elif args.phase == 'test':
                 imdualenhancer_test(model)
             else:
@@ -91,9 +91,10 @@ def main(_):
         print("CPU\n")
         sys.stdout.flush()
         with tf.Session() as sess:
-            model = imdualenhancer(sess, args.n, args.v, args.K, args.batch_size)
+            model = imdualenhancer(sess, args.n, args.v, args.K,
+                    args.batch_size, model_name=args.model_name)
             if args.phase == 'train':
-                imdualenhancer_train(model, lr=lr, proc='cpu')
+                imdualenhancer_train(model, lr=lr, proc='cpu', model_name=args.model_name)
             elif args.phase == 'test':
                 imdualenhancer_test(model)
             else:

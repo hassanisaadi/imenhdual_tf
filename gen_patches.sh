@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=def-shirani
 #SBATCH --mem=50G
-#SBATCH --time=0-00:45
+#SBATCH --time=0-00:15
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=graham.slurm.hassanih@gmail.com
 #SBATCH --output=job_slurm/%J.gen_patches.out
@@ -12,7 +12,7 @@ source /home/hassanih/project/hassanih/ENV/bin/activate
   --src_dir ./data/mb2014_png/train\
   --dst_dir ./data/mb2014_bin\
   --data_aug_times 1\
-  --patch_size 64\
+  --patch_size 16\
   --step 0\
-  --stride 64\
-  --batch_size 32
+  --stride 1200\
+  --batch_size 16

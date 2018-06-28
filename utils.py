@@ -17,88 +17,88 @@ def data_augmentation(image, mode):
         # flip up and down
         return np.flipud(image)
     elif mode == 2:
-        # rotate counterwise 90 degree
-        return np.rot90(image)
-    elif mode == 3:
-        # rotate 90 degree and flip up and down
-        image = np.rot90(image)
-        return np.flipud(image)
-    elif mode == 4:
         # rotate 180 degree
         return np.rot90(image, k=2)
-    elif mode == 5:
+    elif mode == 3:
         # rotate 180 degree and flip
         image = np.rot90(image, k=2)
         return np.flipud(image)
-    elif mode == 6:
+    elif mode == 4:
         # rotate 270 degree
         return np.rot90(image, k=3)
-    elif mode == 7:
+    elif mode == 5:
         # rotate 270 degree and flip
         image = np.rot90(image, k=3)
         return np.flipud(image)
+    elif mode == 6:
+        # rotate counterwise 90 degree
+        return np.rot90(image)
+    elif mode == 7:
+        # rotate 90 degree and flip up and down
+        image = np.rot90(image)
+        return np.flipud(image)
 
 
-class train_data():
-    def __init__(self, fxl='./data/mb2014_bin/imgL.npy',
-                       fxr='./data/mb2014_bin/imgR.npy',
-                       fyl='./data/mb2014_bin/gtL.npy',
-                       fyr='./data/mb2014_bin/gtR.npy'):
-        self.fxl = fxl
-        self.fxr = fxr
-        self.fyl = fyl
-        self.fyr = fyr
-
-        assert '.npy' in fxl
-        assert '.npy' in fxr
-        assert '.npy' in fyl
-        assert '.npy' in fyr
-
-        if not os.path.exists(fxl) or not os.path.exists(fxr) or not os.path.exists(fyl):
-#           not os.path.exists(fyr):
-            print("[!] Data file not exists")
-            sys.exit(1)
-
-    def __enter__(self):
-        print("[*] Loading data...")
-        self.XL = np.load(self.fxl)
-        self.XR = np.load(self.fxr)
-        self.YL = np.load(self.fyl)
-#        self.YR = np.load(self.fyr)
-        #np.random.shuffle(self.data)
-        print("[*] Load successfully...")
-        return self.XL, self.XR, self.YL
-
-    def __exit__(self, type, value, trace):
-        del self.XL
-        del self.XR
-        del self.YL
-#        del self.YR
-        gc.collect()
-        print("In __exit__()")
-
-
-def load_data(fxl='./data/mb2014_bin/imL.npy',
-              fxr='./data/mb2014_bin/imR.npy',
-              fyl='./data/mb2014_bin/YL.npy',
-              fyr='./data/mb2014_bin/YR.npy'):
-    return train_data(fxl=fxl, fxr=fxr, fyl=fyl, fyr=fyr)
+#class train_data():
+#    def __init__(self, fxl='./data/mb2014_bin/imgL.npy',
+#                       fxr='./data/mb2014_bin/imgR.npy',
+#                       fyl='./data/mb2014_bin/gtL.npy',
+#                       fyr='./data/mb2014_bin/gtR.npy'):
+#        self.fxl = fxl
+#        self.fxr = fxr
+#        self.fyl = fyl
+#        self.fyr = fyr
+#
+#        assert '.npy' in fxl
+#        assert '.npy' in fxr
+#        assert '.npy' in fyl
+#        assert '.npy' in fyr
+#
+#        if not os.path.exists(fxl) or not os.path.exists(fxr) or not os.path.exists(fyl):
+##           not os.path.exists(fyr):
+#            print("[!] Data file not exists")
+#            sys.exit(1)
+#
+#    def __enter__(self):
+#        print("[*] Loading data...")
+#        self.XL = np.load(self.fxl)
+#        self.XR = np.load(self.fxr)
+#        self.YL = np.load(self.fyl)
+##        self.YR = np.load(self.fyr)
+#        #np.random.shuffle(self.data)
+#        print("[*] Load successfully...")
+#        return self.XL, self.XR, self.YL
+#
+#    def __exit__(self, type, value, trace):
+#        del self.XL
+#        del self.XR
+#        del self.YL
+##        del self.YR
+#        gc.collect()
+#        print("In __exit__()")
 
 
-def load_images(filelist, sH=1, sW=1):
-    # pixel value range 0-255
-    if not isinstance(filelist, list):
-        im = Image.open(filelist)
-        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
-        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
-        return np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3)
-    data = []
-    for file in filelist:
-        im = Image.open(file)
-        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
-        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
-        data.append(np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3))
-    return data
+#def load_data(fxl='./data/mb2014_bin/imL.npy',
+#              fxr='./data/mb2014_bin/imR.npy',
+#              fyl='./data/mb2014_bin/YL.npy',
+#              fyr='./data/mb2014_bin/YR.npy'):
+#    return train_data(fxl=fxl, fxr=fxr, fyl=fyl, fyr=fyr)
+
+
+#def load_images(filelist, sH=1, sW=1):
+#    # pixel value range 0-255
+#    if not isinstance(filelist, list):
+#        im = Image.open(filelist)
+#        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
+#        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
+#        return np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3)
+#    data = []
+#    for file in filelist:
+#        im = Image.open(file)
+#        newsize = (int(im.size[0]*sH), int(im.size[1]*sW))
+#        im_s = im.resize(newsize, resample=PIL.Image.BICUBIC)
+#        data.append(np.array(im_s).reshape(1, im_s.size[1], im_s.size[0], 3))
+#    return data
 
 
 def save_images(filepath, ground_truth, noisy_image=None, clean_image=None):

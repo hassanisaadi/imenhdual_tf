@@ -12,11 +12,12 @@ from utils import *
 def generate_hdf5():
     PATCH_SIZE = 64
     STEP = 0
-    STRIDE = 128
+    STRIDE = 64
     BATCH_SIZE = 64
     DATA_AUG_TIMES = 1
     W = 512
     H = 512
+    #scales = [1, 0.9]
     #scales = [1, 0.9, 0.8, 0.7]
     scales = [1]
     
@@ -25,13 +26,15 @@ def generate_hdf5():
     hdf5_path   = dst_dir + ('data_da%d_W%d_H%d_p%d_s%d_b%d.hdf5' 
             % (DATA_AUG_TIMES, W, H, PATCH_SIZE, STRIDE, BATCH_SIZE))
 
-    fpxleft_tr  = glob.glob(src_dir + '/train/X_left/*.png')
-    fpxright_tr = glob.glob(src_dir + '/train/X_right/*.png')
-    fpyleft_tr  = glob.glob(src_dir + '/train/Y_left/*.png')
-    fpyright_tr = glob.glob(src_dir + '/train/Y_right/*.png')
+    fpxleft_tr  = sorted(glob.glob(src_dir + '/train/X_left/*.png'))
+    fpxright_tr = sorted(glob.glob(src_dir + '/train/X_right/*.png'))
+    fpyleft_tr  = sorted(glob.glob(src_dir + '/train/Y_left/*.png'))
+    fpyright_tr = sorted(glob.glob(src_dir + '/train/Y_right/*.png'))
+
+    numPics_tr   = len(fpxleft_tr)
 
     count = 0
-    for i in xrange(len(fpxleft_tr)):
+    for i in xrange(numPics_tr):
         img = Image.open(fpxleft_tr[i])
         for s in xrange(len(scales)):
             newsize = (int(img.size[0]*scales[s]), int(img.size[1]*scales[s]))
@@ -46,20 +49,23 @@ def generate_hdf5():
     else:
         numPatches = origin_patch_num
 
-    fpxleft_eval  = glob.glob(src_dir + '/eval/X_left/*.png')
-    fpxright_eval = glob.glob(src_dir + '/eval/X_right/*.png')
-    fpyleft_eval  = glob.glob(src_dir + '/eval/Y_left/*.png')
-    fpyright_eval = glob.glob(src_dir + '/eval/Y_right/*.png')
+    fpxleft_eval  = sorted(glob.glob(src_dir + '/eval/X_left/*.png'))
+    fpxright_eval = sorted(glob.glob(src_dir + '/eval/X_right/*.png'))
+    fpyleft_eval  = sorted(glob.glob(src_dir + '/eval/Y_left/*.png'))
+    fpyright_eval = sorted(glob.glob(src_dir + '/eval/Y_right/*.png'))
 
-    fpxleft_te  = glob.glob(src_dir + '/test/X_left/*.png')
-    fpxright_te = glob.glob(src_dir + '/test/X_right/*.png')
-    fpyleft_te  = glob.glob(src_dir + '/test/Y_left/*.png')
-    fpyright_te = glob.glob(src_dir + '/test/Y_right/*.png')
+    fpxleft_te  = sorted(glob.glob(src_dir + '/test/X_left/*.png'))
+    fpxright_te = sorted(glob.glob(src_dir + '/test/X_right/*.png'))
+    fpyleft_te  = sorted(glob.glob(src_dir + '/test/Y_left/*.png'))
+    fpyright_te = sorted(glob.glob(src_dir + '/test/Y_right/*.png'))
+
+    numPics_eval = len(fpxleft_eval)
+    numPics_te   = len(fpxleft_te)
 
     print("[*] Information...")
-    print("\tNumber of train images %d" % len(fpxleft_tr))
-    print("\tNumber of eval  images %d" % len(fpxleft_eval))
-    print("\tNumber of test  images %d" % len(fpxleft_te))
+    print("\tNumber of train images %d" % numPics_tr)
+    print("\tNumber of eval  images %d" % numPics_eval)
+    print("\tNumber of test  images %d" % numPics_te)
     print("\tPatch size = %d" % PATCH_SIZE)
     print("\tBatch size = %d" % BATCH_SIZE)
     print("\tTotal patches = %d" % numPatches)
@@ -70,9 +76,9 @@ def generate_hdf5():
     print("\tAll test and eval images are resized to %dx%dx3" % (W,H))
     sys.stdout.flush()
 
-    shape_tr   = (numPatches, PATCH_SIZE, PATCH_SIZE, 3)
-    shape_eval = (len(fpxleft_eval), W, H, 3)
-    shape_te   = (len(fpxleft_te  ), W, H, 3)
+    shape_tr   = (numPatches  , PATCH_SIZE, PATCH_SIZE, 3)
+    shape_eval = (numPics_eval, W, H, 3)
+    shape_te   = (numPics_te  , W, H, 3)
 
     hdf5_file = h5py.File(hdf5_path, mode='w')
     hdf5_file.create_dataset("XL_tr", shape_tr, np.uint8)
@@ -92,12 +98,12 @@ def generate_hdf5():
 
     print("[*] Processing Train Images")
     c = 0
-    for i in xrange(len(fpxleft_tr)):
+    for i in xrange(numPics_tr):
         imgL  = Image.open(fpxleft_tr[i])
         imgR  = Image.open(fpxright_tr[i])
         imgYL = Image.open(fpyleft_tr[i])
         imgYR = Image.open(fpyright_tr[i])
- 
+
         print("\t Tr image \#%3d" % (i+1))
         sys.stdout.flush()
 
@@ -108,10 +114,10 @@ def generate_hdf5():
             imgYL_s = imgYL.resize(newsize, resample=PIL.Image.BICUBIC)
             imgYR_s = imgYR.resize(newsize, resample=PIL.Image.BICUBIC)
 
-            imgL_s  = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[0] , imgL_s.size[1] , 3))
-            imgR_s  = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[0] , imgR_s.size[1] , 3))
-            imgYL_s = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[0], imgYL_s.size[1], 3))
-            imgYR_s = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[0], imgYR_s.size[1], 3))
+            imgL_s  = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[1] , imgL_s.size[0] , 3))
+            imgR_s  = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[1] , imgR_s.size[0] , 3))
+            imgYL_s = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[1], imgYL_s.size[0], 3))
+            imgYR_s = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[1], imgYR_s.size[0], 3))
 
             for j in xrange(DATA_AUG_TIMES):
                 im_h, im_w, _ = imgL_s.shape
@@ -132,7 +138,7 @@ def generate_hdf5():
 
     print("[*] Processing Evaluation Images")
     c = 0
-    for i in xrange(len(fpxleft_eval)):
+    for i in xrange(numPics_eval):
         imgL  = Image.open(fpxleft_eval[i])
         imgR  = Image.open(fpxright_eval[i])
         imgYL = Image.open(fpyleft_eval[i])
@@ -145,15 +151,15 @@ def generate_hdf5():
         imgYL_s = imgYL.resize((W,H), resample=PIL.Image.BICUBIC)
         imgYR_s = imgYR.resize((W,H), resample=PIL.Image.BICUBIC)
 
-        hdf5_file["XL_eval"][c, ...] = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[0] , imgL_s.size[1] , 3))
-        hdf5_file["XR_eval"][c, ...] = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[0] , imgR_s.size[1] , 3))
-        hdf5_file["YL_eval"][c, ...] = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[0], imgYL_s.size[1], 3))
-        hdf5_file["YR_eval"][c, ...] = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[0], imgYR_s.size[1], 3))
+        hdf5_file["XL_eval"][c, ...] = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[1] , imgL_s.size[0] , 3))
+        hdf5_file["XR_eval"][c, ...] = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[1] , imgR_s.size[0] , 3))
+        hdf5_file["YL_eval"][c, ...] = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[1], imgYL_s.size[0], 3))
+        hdf5_file["YR_eval"][c, ...] = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[1], imgYR_s.size[0], 3))
         c += 1
 
     print("[*] Processing Test Images")
     c = 0
-    for i in xrange(len(fpxleft_te)):
+    for i in xrange(numPics_te):
         imgL  = Image.open(fpxleft_te[i])
         imgR  = Image.open(fpxright_te[i])
         imgYL = Image.open(fpyleft_te[i])
@@ -167,10 +173,10 @@ def generate_hdf5():
         imgYL_s = imgYL.resize((W,H), resample=PIL.Image.BICUBIC)
         imgYR_s = imgYR.resize((W,H), resample=PIL.Image.BICUBIC)
 
-        hdf5_file["XL_te"][c, ...] = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[0] , imgL_s.size[1] , 3))
-        hdf5_file["XR_te"][c, ...] = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[0] , imgR_s.size[1] , 3))
-        hdf5_file["YL_te"][c, ...] = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[0], imgYL_s.size[1], 3))
-        hdf5_file["YR_te"][c, ...] = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[0], imgYR_s.size[1], 3))
+        hdf5_file["XL_te"][c, ...] = np.reshape(np.array(imgL_s , dtype="uint8"), (imgL_s.size[1] , imgL_s.size[0] , 3))
+        hdf5_file["XR_te"][c, ...] = np.reshape(np.array(imgR_s , dtype="uint8"), (imgR_s.size[1] , imgR_s.size[0] , 3))
+        hdf5_file["YL_te"][c, ...] = np.reshape(np.array(imgYL_s, dtype="uint8"), (imgYL_s.size[1], imgYL_s.size[0], 3))
+        hdf5_file["YR_te"][c, ...] = np.reshape(np.array(imgYR_s, dtype="uint8"), (imgYR_s.size[1], imgYR_s.size[0], 3))
 
     if not os.path.exists(dst_dir):
         os.mkdir(dst_dir)

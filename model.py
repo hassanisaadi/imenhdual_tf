@@ -7,8 +7,9 @@ from math import ceil
 from random import shuffle
 
 def cnn_simple(inL, inR, is_training=True):
-    out = tf.layers.conv2d(inL, 3, 3, (1,1), activation = tf.nn.relu, padding='same')
-    out = tf.layers.conv2d(inL, 3, 3, (1,1), activation = tf.nn.sigmoid, padding='same')
+    with tf.variable_scope('cnn'):
+        out = tf.layers.conv2d(inL, 3, 3, (1,1), activation = tf.nn.relu, padding='same')
+        out = tf.layers.conv2d(inL, 3, 3, (1,1), activation = tf.nn.sigmoid, padding='same')
 #    for i in range(0,0):
 #        out = tf.layers.conv2d(out, 3, 3, (1,1), activation = tf.nn.relu, padding='same')
 #    out = tf.layers.conv2d(out, 3, 3, (1,1), padding='same')
@@ -137,9 +138,13 @@ class imdualenhancer(object):
         self.ckpt_dir = ckpt_dir
 
         # build model
-        self.Y_ = tf.placeholder(tf.float32, [None, None, None, 3], name='normal_patch')
-        self.XL = tf.placeholder(tf.float32, [None, None, None, 3], name='left_patch')
-        self.XR = tf.placeholder(tf.float32, [None, None, None, 3], name='right_patch')
+        with tf.name_scope('input'):
+            self.XL = tf.placeholder(tf.float32, [None, None, None, 3], name='left_patch')
+            tf.summary.image('inputxl',self.XL, 1)
+            self.XR = tf.placeholder(tf.float32, [None, None, None, 3], name='right_patch')
+            tf.summary.image('inputxr',self.XR, 1)
+            self.Y_ = tf.placeholder(tf.float32, [None, None, None, 3], name='normal_patch')
+            tf.summary.image('gtyl',self.Y_, 1)
         self.is_training = tf.placeholder(tf.bool, name='is_training')
         if self.model_name == 'msr_net':
             self.Y = msr_net(self.XL, self.XR, n, v, K, is_training=self.is_training)
@@ -181,20 +186,22 @@ class imdualenhancer(object):
         iter_num = 0
         start_epoch = 0
         #start_step = 0
-        print("[*] Not find pretrained model!")
-        sys.stdout.flush()
+        #print("[*] Not find pretrained model!")
+        #sys.stdout.flush()
 
         # make summary
         tf.summary.scalar('loss', self.loss)
         tf.summary.scalar('lr', self.lr)
-        writer = tf.summary.FileWriter('./logs', self.sess.graph)
+        logdir = './logs/'+self.model_name+'-'+self.proc+'/'
+        if not os.path.exists(logdir):
+            os.makedirs(logdir)
+        writer = tf.summary.FileWriter(logdir, self.sess.graph)
         merged = tf.summary.merge_all()
         summary_psnr = tf.summary.scalar('eva_psnr', self.eva_psnr)
         print("[*] Start training, with start epoch %d: " % start_epoch)
         sys.stdout.flush()
         start_time = time.time()
-        self.evaluate(start_epoch, summary_merged=summary_psnr,
-                                summary_writer=writer)
+        self.evaluate(iter_num, summary_merged=summary_psnr, summary_writer=writer)
         batches_list = list(range(int(ceil(float(data_num)/self.batch_size))))
         for epoch in xrange(start_epoch, end_epoch):
             shuffle(batches_list)
@@ -207,28 +214,27 @@ class imdualenhancer(object):
                 batch_XR = self.hdf5_file["XR_tr"][i_s:i_e, ...].astype(np.float32) / 255.0
                 batch_YL = self.hdf5_file["YL_tr"][i_s:i_e, ...].astype(np.float32) / 255.0
 
-                _, loss[n], summary = self.sess.run(
+                _, loss[i], summary = self.sess.run(
                         [self.train_op, self.loss, merged],
                         feed_dict={self.Y_:batch_YL,
                                    self.XL:batch_XL,
                                    self.XR:batch_XR,
-                                   self.lr: lr[epoch],
+                                   self.lr: lr[epoch], ###!!!
                                    self.is_training:True})
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
-                print("Epoch: [%2d] batch: [%3d/%3d] time: %4.4f, avg_loss: %.6f"
-                     % (epoch+1, n+1, len(batches_list), time.time() - start_time, loss.mean()))
-                sys.stdout.flush()
+            print("Epoch: [%2d] batch: [%3d] time: %4.4f, avg_loss: %.6f"
+                     % (epoch+1, len(batches_list), time.time() - start_time, loss.mean()))
+            sys.stdout.flush()
             if np.mod(epoch+1, eval_every_epoch) == 0:
-                self.evaluate(epoch,
-                             summary_merged=summary_psnr,
-                             summary_writer=writer)
-                self.save(epoch)
+                self.evaluate(iter_num, summary_merged=summary_psnr, summary_writer=writer)
+                self.save(iter_num)
         print("[*] Finish training.")
         sys.stdout.flush()
         self.hdf5_file.close()
+        writer.close()
 
-    def evaluate(self, epoch, summary_merged, summary_writer):
+    def evaluate(self, iter_num, summary_merged, summary_writer):
         print("[*] Evaluating...")
         sys.stdout.flush()
 
@@ -243,11 +249,10 @@ class imdualenhancer(object):
             imL = imL_tmp.reshape(1, imL_tmp.shape[0], imL_tmp.shape[1], imL_tmp.shape[2]) / 255.0
             imR = imR_tmp.reshape(1, imR_tmp.shape[0], imR_tmp.shape[1], imR_tmp.shape[2]) / 255.0
             gt  = gt_tmp.reshape( 1, gt_tmp.shape[0] , gt_tmp.shape[1] , gt_tmp.shape[2] ) / 255.0
-            imOut, psnr_summary = self.sess.run(
-                    [self.Y, summary_merged],
-                    feed_dict={self.Y_:gt, self.XL:imL,
-                               self.XR:imR, self.is_training: False})
-            summary_writer.add_summary(psnr_summary, epoch)
+            imOut, psnr_summary = self.sess.run([self.Y, summary_merged],
+                                  feed_dict={self.Y_:gt, self.XL:imL,
+                                             self.XR:imR, self.is_training: False})
+            summary_writer.add_summary(psnr_summary, iter_num)
             groundtruth = np.clip(gt_tmp   , 0, 255).astype('uint8')
             dark_imageL = np.clip(imL_tmp  , 0, 255).astype('uint8')
             output_image= np.clip(255*imOut, 0, 255).astype('uint8')
@@ -258,14 +263,14 @@ class imdualenhancer(object):
             sys.stdout.flush()
             psnr_sum += psnr
             if idx == 0:
-                save_images(os.path.join(self.eval_dir, 'eval_%s_%s_%d_%d.png' % (self.model_name, self.proc, idx+1, epoch)),
+                save_images(os.path.join(self.eval_dir, 'eval_%s_%s_%d_%d.png' % (self.model_name, self.proc, idx+1, iter_num)),
                         groundtruth, dark_imageL, output_image)
         avg_psnr = psnr_sum / eval_num
-        print("--- Evaluation --- Average PSNR %.2f ---" % avg_psnr)
+        print("--- Evaluation --- Average PSNR %.3f ---" % avg_psnr)
         sys.stdout.flush()
 
 
-    def save(self, epoch):
+    def save(self, iter_num):
         saver = tf.train.Saver()
         checkpoint_dir = self.ckpt_dir
         print("[*] Saving model...")
@@ -273,7 +278,7 @@ class imdualenhancer(object):
         saver.save(self.sess,
                    os.path.join(checkpoint_dir,
                    self.model_name+'-'+self.proc),
-                   global_step=epoch)
+                   global_step=iter_num)
 
     #def load(self, checkpoint_dir):
     #    print("[*] Reading checkpoint...")
